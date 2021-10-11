@@ -30,7 +30,7 @@ macro_rules! make_setting_route {
                 req: HttpRequest,
                 data: GuardedData<Private, data::Data>,
                 index_uid: web::Path<String>,
-                analytics: web::Data<Analytics>,
+                analytics: web::Data<&'static Analytics>,
             ) -> Result<HttpResponse, ResponseError> {
                 use crate::index::Settings;
                 let settings = Settings {
@@ -52,7 +52,7 @@ macro_rules! make_setting_route {
                 data: GuardedData<Private, data::Data>,
                 index_uid: actix_web::web::Path<String>,
                 body: actix_web::web::Json<Option<$type>>,
-                analytics: web::Data<Analytics>,
+                analytics: web::Data<&'static Analytics>,
             ) -> std::result::Result<HttpResponse, ResponseError> {
                 let settings = Settings {
                     $attr: match body.into_inner() {
@@ -76,7 +76,7 @@ macro_rules! make_setting_route {
                 req: HttpRequest,
                 data: GuardedData<Private, data::Data>,
                 index_uid: actix_web::web::Path<String>,
-                analytics: web::Data<Analytics>,
+                analytics: web::Data<&'static Analytics>,
             ) -> std::result::Result<HttpResponse, ResponseError> {
                 let settings = data.settings(index_uid.into_inner()).await?;
                 debug!("returns: {:?}", settings);
@@ -180,7 +180,7 @@ pub async fn update_all(
     data: GuardedData<Private, Data>,
     index_uid: web::Path<String>,
     body: web::Json<Settings<Unchecked>>,
-    analytics: web::Data<Analytics>,
+    analytics: web::Data<&'static Analytics>,
 ) -> Result<HttpResponse, ResponseError> {
     let settings = body.into_inner().check();
     let update_result = data
@@ -200,7 +200,7 @@ pub async fn get_all(
     req: HttpRequest,
     data: GuardedData<Private, Data>,
     index_uid: web::Path<String>,
-    analytics: web::Data<Analytics>,
+    analytics: web::Data<&'static Analytics>,
 ) -> Result<HttpResponse, ResponseError> {
     let settings = data.settings(index_uid.into_inner()).await?;
     analytics.publish("Get all settings".to_string(),
@@ -216,7 +216,7 @@ pub async fn delete_all(
     req: HttpRequest,
     data: GuardedData<Private, Data>,
     index_uid: web::Path<String>,
-    analytics: web::Data<Analytics>,
+    analytics: web::Data<&'static Analytics>,
 ) -> Result<HttpResponse, ResponseError> {
     let settings = Settings::cleared();
     let update_result = data

@@ -77,7 +77,7 @@ pub async fn get_document(
     req: HttpRequest,
     data: GuardedData<Public, Data>,
     path: web::Path<DocumentParam>,
-    analytics: web::Data<Analytics>,
+    analytics: web::Data<&'static Analytics>,
 ) -> Result<HttpResponse, ResponseError> {
     let index = path.index_uid.clone();
     let id = path.document_id.clone();
@@ -97,7 +97,7 @@ pub async fn delete_document(
     req: HttpRequest,
     data: GuardedData<Private, Data>,
     path: web::Path<DocumentParam>,
-    analytics: web::Data<Analytics>,
+    analytics: web::Data<&'static Analytics>,
 ) -> Result<HttpResponse, ResponseError> {
     let update_status = data
         .delete_documents(path.index_uid.clone(), vec![path.document_id.clone()])
@@ -129,7 +129,7 @@ pub async fn get_all_documents(
     data: GuardedData<Public, Data>,
     path: web::Path<IndexParam>,
     params: web::Query<BrowseQuery>,
-    analytics: web::Data<Analytics>,
+    analytics: web::Data<&'static Analytics>,
 ) -> Result<HttpResponse, ResponseError> {
     debug!("called with params: {:?}", params);
     let attributes_to_retrieve = params.attributes_to_retrieve.as_ref().and_then(|attrs| {
@@ -174,7 +174,7 @@ pub async fn add_documents(
     path: web::Path<IndexParam>,
     params: web::Query<UpdateDocumentsQuery>,
     body: Payload,
-    analytics: web::Data<Analytics>,
+    analytics: web::Data<&'static Analytics>,
 ) -> Result<HttpResponse, ResponseError> {
     debug!("called with params: {:?}", params);
     let update_status = data
@@ -204,7 +204,7 @@ pub async fn update_documents(
     path: web::Path<IndexParam>,
     params: web::Query<UpdateDocumentsQuery>,
     body: Payload,
-    analytics: web::Data<Analytics>,
+    analytics: web::Data<&'static Analytics>,
 ) -> Result<HttpResponse, ResponseError> {
     debug!("called with params: {:?}", params);
     let update = data
@@ -231,7 +231,7 @@ pub async fn delete_documents(
     data: GuardedData<Private, Data>,
     path: web::Path<IndexParam>,
     body: web::Json<Vec<Value>>,
-    analytics: web::Data<Analytics>,
+    analytics: web::Data<&'static Analytics>,
 ) -> Result<HttpResponse, ResponseError> {
     debug!("called with params: {:?}", body);
     let ids = body
@@ -257,7 +257,7 @@ pub async fn clear_all_documents(
     req: HttpRequest,
     data: GuardedData<Private, Data>,
     path: web::Path<IndexParam>,
-    analytics: web::Data<Analytics>,
+    analytics: web::Data<&'static Analytics>,
 ) -> Result<HttpResponse, ResponseError> {
     let update_status = data.clear_documents(path.index_uid.clone()).await?;
     analytics.publish("Update all settings".to_string(),

@@ -41,7 +41,7 @@ async fn main() -> Result<(), MainError> {
     if !opt.no_analytics {
         let analytics_data = data.clone();
         // let analytics_opt = opt.clone();
-        analytics.clone().tick(analytics_data);
+        analytics.tick(analytics_data);
     }
 
     print_launch_resume(&opt, &data, &analytics);
@@ -54,7 +54,7 @@ async fn main() -> Result<(), MainError> {
 async fn run_http(
     data: Data,
     opt: Opt,
-    analytics: Analytics,
+    analytics: &'static Analytics,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let _enable_dashboard = &opt.env == "development";
     let http_server = HttpServer::new(move || create_app!(data, analytics, _enable_dashboard))

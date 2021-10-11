@@ -1,6 +1,5 @@
-use segment::client::Client;
-use segment::http::HttpClient;
-use segment::message::{Identify, Message, Track, User};
+use segment::message::{Identify, Track, User};
+use segment::{AutoBatcher, Batcher, Client, HttpClient, Message};
 use serde_json::{json, Value};
 use std::fmt::Display;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -9,6 +8,7 @@ use sysinfo::DiskExt;
 use sysinfo::ProcessorExt;
 use sysinfo::System;
 use sysinfo::SystemExt;
+use tokio::sync::Mutex;
 use uuid::Uuid;
 
 use crate::{Data, Opt};
@@ -16,39 +16,35 @@ use crate::{Data, Opt};
 const SEGMENT_API_KEY: &str = "vHi89WrNDckHSQssyUJqLvIyp2QFITSC";
 static SEND_IDENTIFY: AtomicBool = AtomicBool::new(false);
 
-#[derive(Debug, Clone)]
 pub struct Analytics {
-    user_id: String,
+    user: User,
+    batcher: Mutex<AutoBatcher>,
 }
 
 impl Analytics {
-    pub fn publish(&self, event_name: String, send: Value) {
-        let user = User::UserId {
-            user_id: self.user_id.clone(),
-        };
+    pub fn publish(&'static self, event_name: String, send: Value) {
         tokio::spawn(async move {
-            let client = HttpClient::default();
-            let _ = client
-                .send(
-                    SEGMENT_API_KEY.to_string(),
-                    Message::Track(Track {
-                        user,
-                        event: event_name.clone(),
-                        properties: send,
-                        ..Default::default()
-                    }),
-                )
+            let _ = self
+                .batcher
+                .lock()
+                .await
+                .push(Track {
+                    user: self.user.clone(),
+                    event: event_name.clone(),
+                    properties: send,
+                    ..Default::default()
+                })
                 .await;
             println!("ANALYTICS: {} was sent", event_name)
         });
     }
 
-    pub fn send_identify(&self) {
+    pub fn send_identify(&'static self) {
         println!("ANALYTICS: Will sent an identify event on the next tick");
         SEND_IDENTIFY.store(true, Ordering::Relaxed);
     }
 
-    pub fn tick(self, data: Data) {
+    pub fn tick(&'static self, data: Data) {
         tokio::spawn(async move {
             let first_start = Instant::now();
 
@@ -73,9 +69,7 @@ impl Analytics {
                        "User email": std::env::var("MEILI_USER_EMAIL").ok(),
                        "Server provider": std::env::var("MEILI_SERVER_PROVIDER").ok(),
                     });
-                    let user = User::UserId {
-                        user_id: self.user_id.clone(),
-                    };
+                    let user = self.user.clone();
                     let client = HttpClient::default();
                     println!("ANALYTICS: Sending our identify tick");
                     let _ = client
@@ -95,34 +89,41 @@ impl Analytics {
 }
 
 impl Analytics {
-    pub async fn new(opt: Opt) -> Self {
+    pub async fn new(opt: Opt) -> &'static Self {
         let user_id = std::fs::read_to_string(opt.db_path.join("user-id"));
         let first_time_run = user_id.is_err();
         let user_id = user_id.unwrap_or(Uuid::new_v4().to_string());
-        let segment = Self { user_id };
+        let _ = std::fs::write(opt.db_path.join("user-id"), user_id.as_bytes());
         let client = HttpClient::default();
         let user = User::UserId {
-            user_id: segment.user_id.clone(),
+            user_id: user_id.clone(),
         };
+        let batcher = Batcher::new(None);
+        let batcher = Mutex::new(AutoBatcher::new(
+            client,
+            batcher,
+            SEGMENT_API_KEY.to_string(),
+        ));
+        let segment = Box::new(Self { user, batcher });
+        let segment = Box::leak(segment);
 
         // send an identify event
-        let _ = client
-            .send(
-                SEGMENT_API_KEY.to_string(),
-                Message::Identify(Identify {
-                    user: user.clone(),
-                    traits: Self::compute_traits(&opt),
-                    ..Default::default()
-                }),
-            )
+        let _ = segment
+            .batcher
+            .lock()
+            .await
+            .push(Identify {
+                user: segment.user.clone(),
+                traits: Self::compute_traits(&opt),
+                ..Default::default()
+            })
             .await;
-        println!("ANALYTICS: sent the identify event");
+        println!("ANALYTICS: pushed the identify event");
 
         // send the associated track event
         if first_time_run {
             segment.publish("Launched for the first time".to_string(), json!({}));
         }
-        let _ = std::fs::write(opt.db_path.join("user-id"), segment.user_id.as_bytes());
         segment
     }
 
@@ -156,6 +157,6 @@ impl Analytics {
 
 impl Display for Analytics {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.user_id)
+        write!(f, "{:?}", self.user)
     }
 }

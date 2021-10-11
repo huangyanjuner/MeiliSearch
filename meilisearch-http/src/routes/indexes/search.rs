@@ -88,7 +88,7 @@ pub async fn search_with_url_query(
     data: GuardedData<Public, Data>,
     path: web::Path<IndexParam>,
     params: web::Query<SearchQueryGet>,
-    analytics: web::Data<Analytics>,
+    analytics: web::Data<&'static Analytics>,
 ) -> Result<HttpResponse, ResponseError> {
     debug!("called with params: {:?}", params);
     let query = params.into_inner().into();
@@ -114,7 +114,7 @@ pub async fn search_with_post(
     data: GuardedData<Public, Data>,
     path: web::Path<IndexParam>,
     params: web::Json<SearchQuery>,
-    analytics: web::Data<Analytics>,
+    analytics: web::Data<&'static Analytics>,
 ) -> Result<HttpResponse, ResponseError> {
     debug!("search called with params: {:?}", params);
 

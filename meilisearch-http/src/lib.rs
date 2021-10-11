@@ -59,11 +59,11 @@ use actix_web::web;
 use extractors::authentication::policies::*;
 use extractors::payload::PayloadConfig;
 
-pub fn configure_data(config: &mut web::ServiceConfig, data: Data, analytics: Analytics) {
+pub fn configure_data(config: &mut web::ServiceConfig, data: Data, analytics: &'static Analytics) {
     let http_payload_size_limit = data.http_payload_size_limit();
     config
         .app_data(web::Data::new(data.clone()))
-        .app_data(web::Data::new(analytics.clone()))
+        .app_data(web::Data::new(analytics))
         .app_data(data)
         .app_data(
             web::JsonConfig::default()
@@ -148,7 +148,7 @@ macro_rules! create_app {
         use meilisearch_http::{configure_auth, configure_data, dashboard};
 
         App::new()
-            .configure(|s| configure_data(s, $data.clone(), $analytics.clone()))
+            .configure(|s| configure_data(s, $data.clone(), $analytics))
             .configure(|s| configure_auth(s, &$data))
             .configure(routes::configure)
             .configure(|s| dashboard(s, $enable_frontend))
