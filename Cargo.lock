@@ -2408,8 +2408,7 @@ dependencies = [
 [[package]]
 name = "segment"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fe736985d17620db13ef750190a3172ff4ab0cec12e4507aa80b329e1a191c3"
+source = "git+https://github.com/meilisearch/segment#656b91e1f7a2c6443e2a8ed59f8942400e9a811e"
 dependencies = [
  "async-trait",
  "chrono",
