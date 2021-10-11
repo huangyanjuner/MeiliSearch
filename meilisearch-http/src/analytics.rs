@@ -14,7 +14,6 @@ use uuid::Uuid;
 use crate::{Data, Opt};
 
 const SEGMENT_API_KEY: &str = "vHi89WrNDckHSQssyUJqLvIyp2QFITSC";
-static SEND_IDENTIFY: AtomicBool = AtomicBool::new(false);
 
 pub struct Analytics {
     user: User,
@@ -35,27 +34,22 @@ impl Analytics {
                     ..Default::default()
                 })
                 .await;
-            println!("ANALYTICS: {} was sent", event_name)
+            println!("ANALYTICS: {} added to batch", event_name)
         });
     }
 
-    pub fn send_identify(&'static self) {
-        println!("ANALYTICS: Will sent an identify event on the next tick");
-        SEND_IDENTIFY.store(true, Ordering::Relaxed);
-    }
+    // this will be deleted in the final implementation
+    pub fn send_identify(&'static self) {}
 
     pub fn tick(&'static self, data: Data) {
         tokio::spawn(async move {
             let first_start = Instant::now();
 
             loop {
-                tokio::time::sleep(Duration::from_secs(60 * 5)).await; // 5 minutes
+                tokio::time::sleep(Duration::from_secs(60)).await; // 1 minutes
+                println!("ANALYTICS: should do things");
 
-                if !SEND_IDENTIFY.load(Ordering::Relaxed) {
-                    continue;
-                }
-                SEND_IDENTIFY.store(false, Ordering::Relaxed);
-                if let Ok(stats) = data.index_controller.get_all_stats().await {
+                if let Ok(stats) = dbg!(data.index_controller.get_all_stats().await) {
                     let number_of_documents = stats
                         .indexes
                         .values()
@@ -70,19 +64,20 @@ impl Analytics {
                        "Server provider": std::env::var("MEILI_SERVER_PROVIDER").ok(),
                     });
                     let user = self.user.clone();
-                    let client = HttpClient::default();
-                    println!("ANALYTICS: Sending our identify tick");
-                    let _ = client
-                        .send(
-                            SEGMENT_API_KEY.to_string(),
-                            Message::Identify(Identify {
-                                user,
-                                traits: value,
-                                ..Default::default()
-                            }),
-                        )
+                    println!("ANALYTICS: Pushing our identify tick");
+                    let _ = self
+                        .batcher
+                        .lock()
+                        .await
+                        .push(Identify {
+                            user,
+                            traits: value,
+                            ..Default::default()
+                        })
                         .await;
                 }
+                println!("ANALYTICS: Pushing our batch");
+                let _ = self.batcher.lock().await.flush().await;
             }
         });
     }
